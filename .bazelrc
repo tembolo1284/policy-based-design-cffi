@@ -1,9 +1,5 @@
-# ===========================================================================
-# Disable Bzlmod - Use WORKSPACE instead
-# ===========================================================================
-
-common --noenable_bzlmod
-common --enable_workspace
+# Make Bazel create build-* symlinks instead of bazel-*
+build --symlink_prefix=build/
 
 # ===========================================================================
 # C++ Standard and Common Flags
@@ -60,6 +56,8 @@ build:gcc --cxxopt=-Werror
 
 # Do NOT treat warnings as errors in external/ repos (googletest, etc.)
 build:gcc --per_file_copt=external/.*@-Wno-error
+build:gcc   --per_file_copt=external/.*@-Wno-useless-cast
+build:clang --per_file_copt=external/.*@-Wno-useless-cast
 
 # ===========================================================================
 # Clang Compiler Configuration
