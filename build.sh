@@ -23,9 +23,15 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # ===========================================================================
-# Default Values
+# Default Values (platform-aware)
 # ===========================================================================
-COMPILER="gcc"
+UNAME="$(uname -s)"
+if [[ "$UNAME" == "Darwin" ]]; then
+    COMPILER="clang"
+else
+    COMPILER="gcc"
+fi
+
 BUILD_MODE="debug"
 DO_CLEAN=0
 DO_BUILD=0
@@ -76,8 +82,8 @@ OPTIONS:
     --setup-python       Setup Python environment (install deps, copy .so)
 
   Compiler Selection:
-    --compiler=gcc       Use GCC compiler (default)
-    --compiler=clang     Use Clang compiler
+    --compiler=gcc       Use GCC compiler
+    --compiler=clang     Use Clang compiler (default on macOS)
 
   Build Mode:
     --debug              Debug build with symbols (default)
@@ -95,7 +101,7 @@ CMAKE-LIKE OUTPUT:
       build-testlogs/ (like bazel-testlogs)
 
 CFFI:
-  - --build now also copies the .so into python/ automatically.
+  - --build now also copies the shared lib into python/ automatically.
 EOF
 }
 
@@ -177,9 +183,32 @@ if [[ $VERBOSE -eq 1 ]]; then
     BAZEL_FLAGS="$BAZEL_FLAGS --subcommands --verbose_failures"
 fi
 
-SO_BAZEL_PATH="${BUILD_DIR}/bin/lib/libcalculator_c_api.so"
-SO_BAZEL_FALLBACK="bazel-bin/lib/libcalculator_c_api.so"  # just in case
-SO_PY_PATH="python/libcalculator_c_api.so"
+# Shared lib extension by platform
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    SO_EXT="dylib"
+else
+    SO_EXT="so"
+fi
+
+# Bazel output paths
+# With --symlink_prefix=build/, bazel creates build-bin/ (not build/bin/)
+SO_BAZEL_PATH="${BUILD_DIR}/bin/lib/libcalculator_c_api_shared.${SO_EXT}"
+
+# Fallback: ask bazel where bazel-bin actually is (works everywhere)
+BAZEL_BIN_DIR="$(bazel $BAZEL_STARTUP_FLAGS info bazel-bin)"
+SO_BAZEL_FALLBACK="${BUILD_DIR}/bin/lib/libcalculator_c_api_shared.${SO_EXT}"
+
+if [[ ! -f "$SO_BAZEL_FALLBACK" ]]; then
+    BAZEL_BIN_DIR="$(bazel ${BAZEL_STARTUP_FLAGS} info bazel-bin)"
+    SO_BAZEL_FALLBACK="${BAZEL_BIN_DIR}/lib/libcalculator_c_api_shared.${SO_EXT}"
+fi
+
+# On mac it will find build-bin/lib/libcalculator_c_api_shared.dylib
+
+# On linux it will find build-bin/lib/libcalculator_c_api_shared.so
+
+# We always copy into python/ as .so for CFFI simplicity
+SO_PY_CANONICAL="python/libcalculator_c_api.so"
 
 # ===========================================================================
 # Main Execution
@@ -208,7 +237,7 @@ if [[ $DO_CLEAN -eq 1 ]]; then
 
     print_info "Cleaning Python artifacts..."
     rm -rf python/__pycache__ python/.pytest_cache .pytest_cache htmlcov .coverage
-    rm -f python/*.so
+    rm -f python/*.so python/*.dylib
 
     print_success "Clean complete"
     echo ""
@@ -224,16 +253,16 @@ if [[ $DO_BUILD -eq 1 ]]; then
     bazel $BAZEL_STARTUP_FLAGS build //lib:libcalculator_c_api.so $BAZEL_FLAGS
     print_success "Shared library built successfully"
 
-    # Find the built .so (prefer build-bin path)
+    # Find the built shared lib (prefer build-bin path)
     if [[ -f "$SO_BAZEL_PATH" ]]; then
         print_info "Shared library location: $SO_BAZEL_PATH"
-        cp "$SO_BAZEL_PATH" python/
-        print_success "Copied .so to $SO_PY_PATH"
+        cp "$SO_BAZEL_PATH" "$SO_PY_CANONICAL"
+        print_success "Copied shared lib to $SO_PY_CANONICAL"
     elif [[ -f "$SO_BAZEL_FALLBACK" ]]; then
-        print_warning "Expected .so under build/bin not found, using bazel-bin fallback"
+        print_warning "Expected shared lib under build/bin not found, using bazel-bin fallback"
         print_info "Shared library location: $SO_BAZEL_FALLBACK"
-        cp "$SO_BAZEL_FALLBACK" python/
-        print_success "Copied .so to $SO_PY_PATH"
+        cp "$SO_BAZEL_FALLBACK" "$SO_PY_CANONICAL"
+        print_success "Copied shared lib to $SO_PY_CANONICAL"
     else
         print_error "Shared library not found after build!"
         print_info "Looked for:"
@@ -255,17 +284,17 @@ fi
 if [[ $DO_SETUP_PYTHON -eq 1 ]]; then
     print_header "Setting Up Python Environment"
 
-    if [[ ! -f "$SO_PY_PATH" ]]; then
+    if [[ ! -f "$SO_PY_CANONICAL" ]]; then
         print_warning "python/libcalculator_c_api.so missing, copying from build..."
         if [[ -f "$SO_BAZEL_PATH" ]]; then
-            cp "$SO_BAZEL_PATH" python/
+            cp "$SO_BAZEL_PATH" "$SO_PY_CANONICAL"
         elif [[ -f "$SO_BAZEL_FALLBACK" ]]; then
-            cp "$SO_BAZEL_FALLBACK" python/
+            cp "$SO_BAZEL_FALLBACK" "$SO_PY_CANONICAL"
         else
             print_error "Could not find shared library. Run --build first."
             exit 1
         fi
-        print_success "Shared library copied to python/libcalculator_c_api.so"
+        print_success "Shared library copied to $SO_PY_CANONICAL"
     else
         print_success "Shared library already present in python/"
     fi
@@ -296,7 +325,7 @@ if [[ $DO_TEST -eq 1 ]]; then
     print_success "C++ tests passed"
     echo ""
 
-    if [[ -f "$SO_PY_PATH" ]]; then
+    if [[ -f "$SO_PY_CANONICAL" ]]; then
         print_info "Running Python tests..."
 
         if command -v poetry &> /dev/null && [[ -f "pyproject.toml" ]]; then
@@ -311,8 +340,8 @@ if [[ $DO_TEST -eq 1 ]]; then
             print_warning "No suitable Python test runner found"
         fi
     else
-        print_warning "Shared library not found at $SO_PY_PATH - skipping Python tests"
-        print_info "Run './build.sh --build' (now auto-copies .so) or '--setup-python'"
+        print_warning "Shared library not found at $SO_PY_CANONICAL - skipping Python tests"
+        print_info "Run './build.sh --build' or '--setup-python'"
     fi
 
     echo ""
@@ -324,12 +353,12 @@ fi
 if [[ $DO_PYTHON -eq 1 ]]; then
     print_header "Running Python Example"
 
-    if [[ ! -f "$SO_PY_PATH" ]]; then
+    if [[ ! -f "$SO_PY_CANONICAL" ]]; then
         print_warning "Shared library missing in python/, copying from build..."
         if [[ -f "$SO_BAZEL_PATH" ]]; then
-            cp "$SO_BAZEL_PATH" python/
+            cp "$SO_BAZEL_PATH" "$SO_PY_CANONICAL"
         elif [[ -f "$SO_BAZEL_FALLBACK" ]]; then
-            cp "$SO_BAZEL_FALLBACK" python/
+            cp "$SO_BAZEL_FALLBACK" "$SO_PY_CANONICAL"
         else
             print_error "Could not find shared library. Run --build first."
             exit 1
@@ -373,7 +402,7 @@ print_header "Build Script Complete"
 print_success "All requested operations completed successfully!"
 echo ""
 
-if [[ -f "$SO_PY_PATH" ]]; then
+if [[ -f "$SO_PY_CANONICAL" ]]; then
     print_success "Python bindings are ready to use!"
     echo "  • Import with: from calculator import PresentValueCalculator"
     echo "  • Run example: poetry run python python/example.py"

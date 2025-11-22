@@ -2,7 +2,7 @@
 build --symlink_prefix=build/
 
 # ===========================================================================
-# C++ Standard and Common Flags
+# C++ Standard and Common Flags (portable: GCC + Clang)
 # ===========================================================================
 
 build --cxxopt=-std=c++20
@@ -15,12 +15,10 @@ common --color=yes
 test --test_output=errors
 
 # ===========================================================================
-# Strict Warning Flags (Warnings on, but Werror only for your code)
+# Strict Warning Flags (portable subset)
 # ===========================================================================
-# NOTE:
-# We keep warnings strict globally, but do NOT set -Werror globally anymore.
-# -Werror is enabled per-compiler config below.
-# External repos (googletest, etc.) are exempted from Werror via per_file_copt.
+# Keep only flags that both GCC and Clang understand here.
+# Compiler-specific/older flags get pushed into their own configs below.
 
 build --cxxopt=-Wall
 build --cxxopt=-Wextra
@@ -34,10 +32,11 @@ build --cxxopt=-Woverloaded-virtual
 build --cxxopt=-Wunused
 build --cxxopt=-Wcast-align
 build --cxxopt=-Wformat=2
-build --cxxopt=-Wnull-dereference
+
+# NOTE: -Wnull-dereference is GCC-only -> moved to build:gcc below
 
 # ===========================================================================
-# GCC Compiler Configuration
+# GCC Compiler Configuration (Ubuntu/Linux)
 # ===========================================================================
 
 build:gcc --repo_env=CC=gcc
@@ -45,22 +44,22 @@ build:gcc --repo_env=CXX=g++
 build:gcc --action_env=CC=gcc
 build:gcc --action_env=CXX=g++
 
-# GCC-specific warnings
+# GCC-specific warnings (Clang does NOT support these)
 build:gcc --cxxopt=-Wduplicated-cond
 build:gcc --cxxopt=-Wduplicated-branches
 build:gcc --cxxopt=-Wlogical-op
 build:gcc --cxxopt=-Wuseless-cast
+build:gcc --cxxopt=-Wnull-dereference
 
 # Treat warnings as errors for YOUR code (gcc builds)
 build:gcc --cxxopt=-Werror
 
 # Do NOT treat warnings as errors in external/ repos (googletest, etc.)
 build:gcc --per_file_copt=external/.*@-Wno-error
-build:gcc   --per_file_copt=external/.*@-Wno-useless-cast
-build:clang --per_file_copt=external/.*@-Wno-useless-cast
+build:gcc --per_file_copt=external/.*@-Wno-useless-cast
 
 # ===========================================================================
-# Clang Compiler Configuration
+# Clang Compiler Configuration (macOS + optional Linux)
 # ===========================================================================
 
 build:clang --repo_env=CC=clang
@@ -72,11 +71,16 @@ build:clang --action_env=CXX=clang++
 build:clang --cxxopt=-Wmost
 build:clang --cxxopt=-Wthread-safety
 
+# IMPORTANT:
+# Ignore unknown warning options so GCC-only flags never hard-fail on Clang.
+build:clang --cxxopt=-Wno-unknown-warning-option
+
 # Treat warnings as errors for YOUR code (clang builds)
 build:clang --cxxopt=-Werror
 
 # Do NOT treat warnings as errors in external/ repos
 build:clang --per_file_copt=external/.*@-Wno-error
+build:clang --per_file_copt=external/.*@-Wno-useless-cast
 
 # ===========================================================================
 # Debug Configuration

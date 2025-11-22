@@ -27,10 +27,23 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
-# Shared library for CFFI
+# ---------------------------------------------------------------------------
+# Shared library for CFFI (platform-native output)
+#
+# On Linux: produces libcalculator_c_api.dso / .so
+# On macOS: produces libcalculator_c_api.dylib
+# ---------------------------------------------------------------------------
 cc_binary(
-    name = "libcalculator_c_api.so",
+    name = "calculator_c_api_shared",
     linkshared = 1,
     deps = [":calculator_c_api_impl"],
     visibility = ["//visibility:public"],
 )
+
+# Backwards-compatible alias preserving your old label
+alias(
+    name = "libcalculator_c_api.so",
+    actual = ":calculator_c_api_shared",
+    visibility = ["//visibility:public"],
+)
+

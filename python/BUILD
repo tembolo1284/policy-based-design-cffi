@@ -1,28 +1,25 @@
-# Python library with CFFI bindings
+load("@rules_python//python:defs.bzl", "py_library", "py_test", "py_binary")
+
+package(default_visibility = ["//visibility:public"])
+
+# Your actual Python package: python/calculator/...
 py_library(
     name = "calculator",
     srcs = [
-        "__init__.py",
-        "calculator_cffi.py",
+        "calculator/__init__.py",
+        "calculator/calculator_cffi.py",
     ],
-    data = ["//lib:libcalculator_c_api.so"],
-    visibility = ["//visibility:public"],
-    deps = [],
 )
 
-# Python example
 py_binary(
     name = "example",
     srcs = ["example.py"],
     deps = [":calculator"],
-    data = ["//lib:libcalculator_c_api.so"],
 )
 
-# Python tests
 py_test(
     name = "calculator_test",
     srcs = ["calculator_test.py"],
     deps = [":calculator"],
-    data = ["//lib:libcalculator_c_api.so"],
-    size = "small",
 )
+
