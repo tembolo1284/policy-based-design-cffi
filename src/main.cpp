@@ -198,7 +198,8 @@ int main() {
     // Test 2: Invalid discount rate
     std::cout << "\nTest 2: Invalid discount rate (≤ -1)\n";
     try {
-        pv_calc.calculate(-1.5, {100.0});
+        std::vector<double> test_cf = {100.0};
+        pv_calc.calculate(-1.5, test_cf);
         std::cout << "  ERROR: Should have thrown exception!\n";
     } catch (const std::exception& e) {
         std::cout << "  ✓ Caught exception: " << e.what() << "\n";

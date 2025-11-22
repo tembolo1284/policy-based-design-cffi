@@ -1,10 +1,14 @@
 # ===========================================================================
-# Bazel Configuration for Policy-Based Design Calculator
+# Disable Bzlmod - Use WORKSPACE instead
 # ===========================================================================
+
+common --noenable_bzlmod
+common --enable_workspace
 
 # ===========================================================================
 # C++ Standard and Common Flags
 # ===========================================================================
+
 build --cxxopt=-std=c++20
 build --host_cxxopt=-std=c++20
 
@@ -15,11 +19,15 @@ common --color=yes
 test --test_output=errors
 
 # ===========================================================================
-# Strict Warning Flags (All Warnings as Errors)
+# Strict Warning Flags (Warnings on, but Werror only for your code)
 # ===========================================================================
+# NOTE:
+# We keep warnings strict globally, but do NOT set -Werror globally anymore.
+# -Werror is enabled per-compiler config below.
+# External repos (googletest, etc.) are exempted from Werror via per_file_copt.
+
 build --cxxopt=-Wall
 build --cxxopt=-Wextra
-build --cxxopt=-Werror
 build --cxxopt=-Wpedantic
 build --cxxopt=-Wshadow
 build --cxxopt=-Wconversion
@@ -35,6 +43,7 @@ build --cxxopt=-Wnull-dereference
 # ===========================================================================
 # GCC Compiler Configuration
 # ===========================================================================
+
 build:gcc --repo_env=CC=gcc
 build:gcc --repo_env=CXX=g++
 build:gcc --action_env=CC=gcc
@@ -46,9 +55,16 @@ build:gcc --cxxopt=-Wduplicated-branches
 build:gcc --cxxopt=-Wlogical-op
 build:gcc --cxxopt=-Wuseless-cast
 
+# Treat warnings as errors for YOUR code (gcc builds)
+build:gcc --cxxopt=-Werror
+
+# Do NOT treat warnings as errors in external/ repos (googletest, etc.)
+build:gcc --per_file_copt=external/.*@-Wno-error
+
 # ===========================================================================
 # Clang Compiler Configuration
 # ===========================================================================
+
 build:clang --repo_env=CC=clang
 build:clang --repo_env=CXX=clang++
 build:clang --action_env=CC=clang
@@ -58,9 +74,16 @@ build:clang --action_env=CXX=clang++
 build:clang --cxxopt=-Wmost
 build:clang --cxxopt=-Wthread-safety
 
+# Treat warnings as errors for YOUR code (clang builds)
+build:clang --cxxopt=-Werror
+
+# Do NOT treat warnings as errors in external/ repos
+build:clang --per_file_copt=external/.*@-Wno-error
+
 # ===========================================================================
 # Debug Configuration
 # ===========================================================================
+
 build:debug --compilation_mode=dbg
 build:debug --copt=-O0
 build:debug --copt=-g
@@ -69,6 +92,7 @@ build:debug --strip=never
 # ===========================================================================
 # Release Configuration
 # ===========================================================================
+
 build:release --compilation_mode=opt
 build:release --copt=-O3
 build:release --copt=-DNDEBUG
@@ -81,6 +105,7 @@ build:release --linkopt=-flto
 # ===========================================================================
 # Sanitizers (Optional - for debugging)
 # ===========================================================================
+
 # Address Sanitizer
 build:asan --strip=never
 build:asan --copt=-fsanitize=address
@@ -110,6 +135,7 @@ build:tsan --linkopt=-fsanitize=thread
 # ===========================================================================
 # Test Configuration
 # ===========================================================================
+
 test --test_output=errors
 test --test_summary=detailed
 test --cache_test_results=no
@@ -121,6 +147,7 @@ test:verbose_test --test_arg=--gtest_color=yes
 # ===========================================================================
 # Python Configuration
 # ===========================================================================
+
 # Ensure Python tests can find shared libraries
 test --action_env=LD_LIBRARY_PATH
 build --action_env=LD_LIBRARY_PATH
@@ -128,19 +155,13 @@ build --action_env=LD_LIBRARY_PATH
 # ===========================================================================
 # Performance and Caching
 # ===========================================================================
+
 build --jobs=auto
 build --experimental_reuse_sandbox_directories
 
 # ===========================================================================
-# Default Configuration
-# ===========================================================================
-# Use GCC in debug mode by default
-build --config=gcc
-build --config=debug
-
-# ===========================================================================
 # User-Specific Configuration (Optional)
 # ===========================================================================
-# You can create a .bazelrc.user file for local overrides
-# This file should be added to .gitignore
+
 try-import %workspace%/.bazelrc.user
+
