@@ -1,0 +1,146 @@
+# ===========================================================================
+# Bazel Configuration for Policy-Based Design Calculator
+# ===========================================================================
+
+# ===========================================================================
+# C++ Standard and Common Flags
+# ===========================================================================
+build --cxxopt=-std=c++20
+build --host_cxxopt=-std=c++20
+
+# Enable colors in output
+common --color=yes
+
+# Show test output on failure
+test --test_output=errors
+
+# ===========================================================================
+# Strict Warning Flags (All Warnings as Errors)
+# ===========================================================================
+build --cxxopt=-Wall
+build --cxxopt=-Wextra
+build --cxxopt=-Werror
+build --cxxopt=-Wpedantic
+build --cxxopt=-Wshadow
+build --cxxopt=-Wconversion
+build --cxxopt=-Wsign-conversion
+build --cxxopt=-Wold-style-cast
+build --cxxopt=-Wnon-virtual-dtor
+build --cxxopt=-Woverloaded-virtual
+build --cxxopt=-Wunused
+build --cxxopt=-Wcast-align
+build --cxxopt=-Wformat=2
+build --cxxopt=-Wnull-dereference
+
+# ===========================================================================
+# GCC Compiler Configuration
+# ===========================================================================
+build:gcc --repo_env=CC=gcc
+build:gcc --repo_env=CXX=g++
+build:gcc --action_env=CC=gcc
+build:gcc --action_env=CXX=g++
+
+# GCC-specific warnings
+build:gcc --cxxopt=-Wduplicated-cond
+build:gcc --cxxopt=-Wduplicated-branches
+build:gcc --cxxopt=-Wlogical-op
+build:gcc --cxxopt=-Wuseless-cast
+
+# ===========================================================================
+# Clang Compiler Configuration
+# ===========================================================================
+build:clang --repo_env=CC=clang
+build:clang --repo_env=CXX=clang++
+build:clang --action_env=CC=clang
+build:clang --action_env=CXX=clang++
+
+# Clang-specific warnings
+build:clang --cxxopt=-Wmost
+build:clang --cxxopt=-Wthread-safety
+
+# ===========================================================================
+# Debug Configuration
+# ===========================================================================
+build:debug --compilation_mode=dbg
+build:debug --copt=-O0
+build:debug --copt=-g
+build:debug --strip=never
+
+# ===========================================================================
+# Release Configuration
+# ===========================================================================
+build:release --compilation_mode=opt
+build:release --copt=-O3
+build:release --copt=-DNDEBUG
+build:release --strip=always
+
+# Enable link-time optimization in release mode
+build:release --copt=-flto
+build:release --linkopt=-flto
+
+# ===========================================================================
+# Sanitizers (Optional - for debugging)
+# ===========================================================================
+# Address Sanitizer
+build:asan --strip=never
+build:asan --copt=-fsanitize=address
+build:asan --copt=-DADDRESS_SANITIZER
+build:asan --copt=-O1
+build:asan --copt=-g
+build:asan --copt=-fno-omit-frame-pointer
+build:asan --linkopt=-fsanitize=address
+
+# Undefined Behavior Sanitizer
+build:ubsan --strip=never
+build:ubsan --copt=-fsanitize=undefined
+build:ubsan --copt=-O1
+build:ubsan --copt=-g
+build:ubsan --copt=-fno-omit-frame-pointer
+build:ubsan --linkopt=-fsanitize=undefined
+
+# Thread Sanitizer
+build:tsan --strip=never
+build:tsan --copt=-fsanitize=thread
+build:tsan --copt=-DTHREAD_SANITIZER
+build:tsan --copt=-O1
+build:tsan --copt=-g
+build:tsan --copt=-fno-omit-frame-pointer
+build:tsan --linkopt=-fsanitize=thread
+
+# ===========================================================================
+# Test Configuration
+# ===========================================================================
+test --test_output=errors
+test --test_summary=detailed
+test --cache_test_results=no
+
+# Verbose test output (use with --config=verbose_test)
+test:verbose_test --test_output=all
+test:verbose_test --test_arg=--gtest_color=yes
+
+# ===========================================================================
+# Python Configuration
+# ===========================================================================
+# Ensure Python tests can find shared libraries
+test --action_env=LD_LIBRARY_PATH
+build --action_env=LD_LIBRARY_PATH
+
+# ===========================================================================
+# Performance and Caching
+# ===========================================================================
+build --jobs=auto
+build --experimental_reuse_sandbox_directories
+
+# ===========================================================================
+# Default Configuration
+# ===========================================================================
+# Use GCC in debug mode by default
+build --config=gcc
+build --config=debug
+
+# ===========================================================================
+# User-Specific Configuration (Optional)
+# ===========================================================================
+# You can create a .bazelrc.user file for local overrides
+# This file should be added to .gitignore
+try-import %workspace%/.bazelrc.user
