@@ -1,4 +1,4 @@
-# C++ Tests using Google Test
+# C++ Tests using Google Test (Bzlmod)
 
 cc_test(
     name = "Calculator_Test",
@@ -6,6 +6,7 @@ cc_test(
     srcs = ["calculator_test.cpp"],
     deps = [
         "//lib:Calculator",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
+
