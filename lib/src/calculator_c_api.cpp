@@ -1,8 +1,10 @@
 #include "calculator_c_api.h"
 #include "Calculator.hpp"
 #include "CalculationPolicies.hpp"
+
 #include <string>
 #include <cstring>
+#include <vector>
 
 // ===========================================================================
 // Internal Wrapper Structs (implementation of opaque handles)
@@ -22,6 +24,12 @@ struct IRCalculator_t {
     Calculator<InterestRateConversionPolicy> calc;
     std::string last_error;
 };
+
+// ===========================================================================
+// C API (exported with C linkage so symbols are unmangled for CFFI)
+// ===========================================================================
+
+extern "C" {
 
 // ===========================================================================
 // Present Value Calculator Implementation
@@ -173,3 +181,6 @@ const char* ir_calculator_get_error(IRCalculatorHandle calc) {
 void ir_calculator_destroy(IRCalculatorHandle calc) {
     delete calc;
 }
+
+} // extern "C"
+

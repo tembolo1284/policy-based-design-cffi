@@ -18,20 +18,19 @@ cc_library(
 )
 
 # C API Implementation Library
+# alwayslink=True ensures these objects are not dead-stripped on macOS
 cc_library(
     name = "calculator_c_api_impl",
     srcs = ["src/calculator_c_api.cpp"],
     hdrs = ["include/calculator_c_api.h"],
     deps = [":Calculator"],
     strip_include_prefix = "include",
+    alwayslink = True,  # <-- KEY FIX for mac + still safe on linux. Took AGES to figure out.
     visibility = ["//visibility:public"],
 )
 
 # ---------------------------------------------------------------------------
 # Shared library for CFFI (platform-native output)
-#
-# On Linux: produces libcalculator_c_api.dso / .so
-# On macOS: produces libcalculator_c_api.dylib
 # ---------------------------------------------------------------------------
 cc_binary(
     name = "calculator_c_api_shared",

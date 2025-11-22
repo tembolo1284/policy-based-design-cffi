@@ -52,10 +52,30 @@ policy_based_design/
 
 ### Required
 
-- **Bazel** 6.0+ (https://bazel.build/install)
-- **GCC** 11+ or **Clang** 14+ (C++20 support)
-- **Python** 3.11+
-- **Poetry** 1.7+ (https://python-poetry.org/docs/#installation)
+| Component        | Version            | Notes                            |
+| ---------------- | ------------------ | -------------------------------- |
+| **Python**       | 3.11+              | 3.13 tested on macOS             |
+| **Poetry**       | 2.0+               | Handles Python deps & virtualenv |
+| **Bazel**        | 8.x (via Bazelisk) | Required for C++/C API builds    |
+| **C++ Compiler** | C++20-capable      | GCC 11+ or Clang 14+             |
+| **make, git**    | Latest             | Optional but recommended         |
+
+## Recommended Installers
+
+### macOS
+
+Use Homebrew for Bazelisk & Python (brew install bazelisk python)
+
+Xcode Command Line Tools must be installed (xcode-select --install)
+
+Poetry installed via the official script
+
+### Ubuntu / Debian
+
+GCC 11+ or LLVM/Clang 14+
+
+Bazelisk binary (recommended over distro packages)
+
 
 ### Optional
 
@@ -68,19 +88,23 @@ policy_based_design/
 
 #### Ubuntu/Debian
 ```bash
-# Install Bazel
 sudo apt update
-sudo apt install apt-transport-https curl gnupg
-curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > bazel.gpg
-sudo mv bazel.gpg /etc/apt/trusted.gpg.d/
-echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
-sudo apt update && sudo apt install bazel
+sudo apt install -y build-essential clang python3 python3-venv python3-pip git curl
+
+# Install Bazelisk (recommended)
+sudo curl -L -o /usr/local/bin/bazel \
+  https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
+sudo chmod +x /usr/local/bin/bazel
+
+# Install Poetry
+curl -sSL https://install.python-poetry.org | python3 -
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
 
 # Install GCC/Clang and Python
 sudo apt install build-essential clang python3.11 python3.11-dev python3-pip
 
-# Install Poetry
-curl -sSL https://install.python-poetry.org | python3 -
 ```
 
 #### macOS
@@ -94,6 +118,8 @@ xcode-select --install
 # Install Python and Poetry
 brew install python@3.11
 curl -sSL https://install.python-poetry.org | python3 -
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
 ```
 
 #### Verify Installation
@@ -125,7 +151,7 @@ bazel build //lib:libcalculator_c_api.so --config=gcc --config=release
 
 The shared library will be created at:
 ```
-bazel-bin/lib/libcalculator_c_api.so
+build/bin/lib/libcalculator_c_api.so
 ```
 
 ### Step 3: Setup Python Environment
@@ -158,7 +184,7 @@ The Python bindings need to find the shared library. You have several options:
 
 #### Option A: Copy to Python directory (Recommended for development)
 ```bash
-cp bazel-bin/lib/libcalculator_c_api.so python/
+cp build/bin/lib/libcalculator_c_api.so python/
 ```
 
 #### Option B: Set LD_LIBRARY_PATH
@@ -495,12 +521,10 @@ __all__ = [..., 'NewCalculator']
 
 ### Code Formatting
 ```bash
-# Format Python code
-poetry run black python/
-poetry run ruff check python/ --fix
 
 # Check types
 poetry run mypy python/
+
 ```
 
 ### Build Configuration
@@ -512,16 +536,6 @@ The `.bazelrc` file contains:
 - Optimization flags
 
 ## Troubleshooting
-
-### Library Not Found Error
-
-**Error**: `OSError: cannot load library 'libcalculator_c_api.so'`
-
-**Solutions**:
-1. Build the shared library first: `./build.sh --build`
-2. Copy to Python directory: `cp bazel-bin/lib/libcalculator_c_api.so python/`
-3. Set library path: `export LD_LIBRARY_PATH=$(pwd)/bazel-bin/lib:$LD_LIBRARY_PATH`
-4. Use build script: `./build.sh --python` (handles this automatically)
 
 ### CFFI Import Error
 
