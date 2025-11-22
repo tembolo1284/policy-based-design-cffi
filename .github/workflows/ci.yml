@@ -26,7 +26,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
 
       - name: Install Poetry
         uses: snok/install-poetry@v1
@@ -39,16 +38,28 @@ jobs:
         run: poetry install --no-interaction
 
       # -----------------------
-      # Bazel (Bazelisk) + cache
+      # Bazelisk (official)
       # -----------------------
-      - name: Set up Bazelisk / Bazel
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          # Uses bazelisk by default; caches bazel outputs automatically.
-          bazelisk-version: "latest"
-          cache: true
+      - name: Set up Bazelisk
+        uses: bazelbuild/setup-bazelisk@v3
+        # optional: pin bazelisk version if you want
+        # with:
+        #   bazelisk-version: "1.25.0"
 
-      # Helpful for debugging CI environments
+      # -----------------------
+      # Bazel cache (simple + effective)
+      # -----------------------
+      - name: Cache Bazel
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/bazel
+            ~/.cache/bazelisk
+            ~/.bazel
+          key: bazel-${{ runner.os }}-${{ hashFiles('MODULE.bazel', 'MODULE.bazel.lock', '**/BUILD', '**/BUILD.bazel', '.bazelrc') }}
+          restore-keys: |
+            bazel-${{ runner.os }}-
+
       - name: Show tool versions
         run: |
           bazel --version
@@ -56,8 +67,7 @@ jobs:
           poetry --version
 
       # -----------------------
-      # Build C++ + Shared Lib
-      # Use clang on mac, gcc on linux
+      # Build all targets
       # -----------------------
       - name: Bazel build (all targets)
         run: |
@@ -68,26 +78,27 @@ jobs:
           fi
 
       # -----------------------
-      # C++ Tests
+      # C++ tests
       # -----------------------
       - name: Run C++ tests
         run: |
           if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
-            bazel test //lib/test:Calculator_Test --config=clang --config=debug --symlink_prefix=build/ --test_output=errors
+            bazel test //lib/test:Calculator_Test \
+              --config=clang --config=debug --symlink_prefix=build/ --test_output=errors
           else
-            bazel test //lib/test:Calculator_Test --config=gcc --config=debug --symlink_prefix=build/ --test_output=errors
+            bazel test //lib/test:Calculator_Test \
+              --config=gcc --config=debug --symlink_prefix=build/ --test_output=errors
           fi
 
       # -----------------------
-      # Copy shared library for CFFI
-      # - mac outputs .dylib, linux outputs .so
-      # - we always rename to python/libcalculator_c_api.so
+      # Copy shared library into python/
       # -----------------------
       - name: Copy shared library into python/
         shell: bash
         run: |
           set -euo pipefail
           BAZEL_BIN_DIR="$(bazel info bazel-bin)"
+
           if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
             SO_EXT="dylib"
           else
@@ -100,7 +111,7 @@ jobs:
           echo "Looking for shared lib at: $LIB_PATH"
 
           if [[ ! -f "$LIB_PATH" ]]; then
-            echo "Shared library not found!"
+            echo "Shared library not found — listing candidate files:"
             find "$BAZEL_BIN_DIR/lib" -maxdepth 1 -name "libcalculator_c_api_shared.*" || true
             exit 1
           fi
@@ -109,7 +120,7 @@ jobs:
           ls -l python/libcalculator_c_api.so
 
       # -----------------------
-      # Python Tests + Example
+      # Python tests + example
       # -----------------------
       - name: Run Python tests
         run: poetry run pytest python/ -v
