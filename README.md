@@ -341,6 +341,34 @@ int main() {
     return 0;
 }
 ```
+## Docker (Linux container)
+
+This project can be built and tested in a Linux container for reproducible builds.
+
+Build the image from the repo root:
+```bash
+docker build -t policy-cffi .
+```
+
+Run the container (default command runs the Python example):
+
+```bash
+docker run --rm policy-cffi
+```
+
+Interactive dev shell:
+
+```bash
+docker run --rm -it -v "$PWD":/app plicy-cffi bash
+```
+
+Inside the container you can rebuild and test as needed:
+
+```bash
+./build.sh --clean --all
+poetry run python python/example.py
+
+```
 
 ## Testing
 

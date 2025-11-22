@@ -42,7 +42,7 @@ jobs:
       # Bazel (Bazelisk) + cache
       # -----------------------
       - name: Set up Bazelisk / Bazel
-        uses: bazel-contrib/setup-bazel@v1
+        uses: bazel-contrib/setup-bazel@v0.15.0
         with:
           # Uses bazelisk by default; caches bazel outputs automatically.
           bazelisk-version: "latest"
