@@ -47,7 +47,7 @@ jobs:
         uses: bazelbuild/setup-bazelisk@v3
 
       # -----------------------
-      # Bazel cache (simple + effective)
+      # Bazel cache
       # -----------------------
       - name: Cache Bazel
         uses: actions/cache@v4
@@ -98,14 +98,13 @@ jobs:
 
       # -----------------------
       # Copy shared library into python/
-      #   - do NOT assume bazel-bin/lib/ exists on mac runners
-      #   - find actual output under bazel-bin
+      #   - Prefer your known-good build/bin/lib layout
+      #   - Fallback to build-bin / bazel-bin / find
       # -----------------------
       - name: Copy shared library into python/
         shell: bash
         run: |
           set -euo pipefail
-          BAZEL_BIN_DIR="$(bazel info bazel-bin)"
 
           if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
             SO_EXT="dylib"
@@ -113,14 +112,34 @@ jobs:
             SO_EXT="so"
           fi
 
-          echo "BAZEL_BIN_DIR=$BAZEL_BIN_DIR"
-          echo "Searching for libcalculator_c_api_shared.${SO_EXT} ..."
+          # 1) Your known-good local layout
+          CANDIDATE_1="build/bin/lib/libcalculator_c_api_shared.${SO_EXT}"
 
-          LIB_PATH="$(find "$BAZEL_BIN_DIR" -type f -name "libcalculator_c_api_shared.${SO_EXT}" | head -n 1 || true)"
+          # 2) Bazel symlink created by --symlink_prefix=build/
+          CANDIDATE_2="build-bin/lib/libcalculator_c_api_shared.${SO_EXT}"
 
-          if [[ -z "$LIB_PATH" ]]; then
-            echo "Shared library not found in bazel-bin. Dumping likely candidates:"
-            find "$BAZEL_BIN_DIR" -type f -name "libcalculator_c_api*.${SO_EXT}" || true
+          # 3) Default Bazel symlink (if it exists)
+          CANDIDATE_3="bazel-bin/lib/libcalculator_c_api_shared.${SO_EXT}"
+
+          echo "Trying candidates:"
+          echo "  1) $CANDIDATE_1"
+          echo "  2) $CANDIDATE_2"
+          echo "  3) $CANDIDATE_3"
+
+          if [[ -f "$CANDIDATE_1" ]]; then
+            LIB_PATH="$CANDIDATE_1"
+          elif [[ -f "$CANDIDATE_2" ]]; then
+            LIB_PATH="$CANDIDATE_2"
+          elif [[ -f "$CANDIDATE_3" ]]; then
+            LIB_PATH="$CANDIDATE_3"
+          else
+            echo "Direct candidates not found; searching workspace..."
+            LIB_PATH="$(find . -type f -name "libcalculator_c_api_shared.${SO_EXT}" | head -n 1 || true)"
+          fi
+
+          if [[ -z "${LIB_PATH:-}" || ! -f "$LIB_PATH" ]]; then
+            echo "Shared library still not found. Dumping any calculator libs:"
+            find . -type f -name "libcalculator_c_api*" || true
             exit 1
           fi
 
@@ -132,7 +151,7 @@ jobs:
       # Python tests + example
       # -----------------------
       - name: Run Python tests
-        run: poetry run pytest python/ -vvv
+        run: poetry run pytest python/ -v
 
       - name: Run Python example
         run: poetry run python python/example.py
