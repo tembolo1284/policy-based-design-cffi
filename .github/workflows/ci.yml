@@ -16,6 +16,9 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
+      # -----------------------
+      # Checkout
+      # -----------------------
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -42,9 +45,6 @@ jobs:
       # -----------------------
       - name: Set up Bazelisk
         uses: bazelbuild/setup-bazelisk@v3
-        # optional: pin bazelisk version if you want
-        # with:
-        #   bazelisk-version: "1.25.0"
 
       # -----------------------
       # Bazel cache (simple + effective)
@@ -67,13 +67,17 @@ jobs:
           poetry --version
 
       # -----------------------
-      # Build all targets
+      # Build shared library first, then all targets
       # -----------------------
-      - name: Bazel build (all targets)
+      - name: Bazel build (shared lib first, then all)
+        shell: bash
         run: |
+          set -euo pipefail
           if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            bazel build //lib:calculator_c_api_shared --config=clang --config=debug --symlink_prefix=build/
             bazel build //... --config=clang --config=debug --symlink_prefix=build/
           else
+            bazel build //lib:calculator_c_api_shared --config=gcc --config=debug --symlink_prefix=build/
             bazel build //... --config=gcc --config=debug --symlink_prefix=build/
           fi
 
@@ -81,7 +85,9 @@ jobs:
       # C++ tests
       # -----------------------
       - name: Run C++ tests
+        shell: bash
         run: |
+          set -euo pipefail
           if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
             bazel test //lib/test:Calculator_Test \
               --config=clang --config=debug --symlink_prefix=build/ --test_output=errors
@@ -92,6 +98,8 @@ jobs:
 
       # -----------------------
       # Copy shared library into python/
+      #   - do NOT assume bazel-bin/lib/ exists on mac runners
+      #   - find actual output under bazel-bin
       # -----------------------
       - name: Copy shared library into python/
         shell: bash
@@ -105,17 +113,18 @@ jobs:
             SO_EXT="so"
           fi
 
-          LIB_PATH="${BAZEL_BIN_DIR}/lib/libcalculator_c_api_shared.${SO_EXT}"
-
           echo "BAZEL_BIN_DIR=$BAZEL_BIN_DIR"
-          echo "Looking for shared lib at: $LIB_PATH"
+          echo "Searching for libcalculator_c_api_shared.${SO_EXT} ..."
 
-          if [[ ! -f "$LIB_PATH" ]]; then
-            echo "Shared library not found — listing candidate files:"
-            find "$BAZEL_BIN_DIR/lib" -maxdepth 1 -name "libcalculator_c_api_shared.*" || true
+          LIB_PATH="$(find "$BAZEL_BIN_DIR" -type f -name "libcalculator_c_api_shared.${SO_EXT}" | head -n 1 || true)"
+
+          if [[ -z "$LIB_PATH" ]]; then
+            echo "Shared library not found in bazel-bin. Dumping likely candidates:"
+            find "$BAZEL_BIN_DIR" -type f -name "libcalculator_c_api*.${SO_EXT}" || true
             exit 1
           fi
 
+          echo "Found shared lib at: $LIB_PATH"
           cp "$LIB_PATH" python/libcalculator_c_api.so
           ls -l python/libcalculator_c_api.so
 
@@ -123,7 +132,7 @@ jobs:
       # Python tests + example
       # -----------------------
       - name: Run Python tests
-        run: poetry run pytest python/ -v
+        run: poetry run pytest python/ -vvv
 
       - name: Run Python example
         run: poetry run python python/example.py
